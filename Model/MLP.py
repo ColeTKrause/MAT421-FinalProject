@@ -14,17 +14,17 @@ torch.manual_seed(42)
 
 # Dataset
 class BreatCancerDataset(Dataset):
-    def __init__(self, train_x, train_y):
-        super(Dataset, self).__init__()
-        self.train_x = train_x
-        self.train_y = train_y
+    def __init__(self, data, labels):
+        super(BreatCancerDataset, self).__init__()
+        self.data = data
+        self.labels = labels
 
     def __len__(self):
-        return len(train_y)
+        return len(self.labels)
 
     def __getitem__(self, idx):
-        sample = torch.tensor(train_x[idx], dtype=torch.double)
-        label = torch.tensor(train_y[idx], dtype=torch.int)
+        sample = torch.tensor(self.data[idx], dtype=torch.double)
+        label = torch.tensor(self.labels[idx], dtype=torch.int)
         return sample, label
 
 # Neural Network 
@@ -78,6 +78,7 @@ def preprocess(data_path):
     train_x = torch.tensor(np.array(train_x))
     train_y = torch.tensor(np.array(train_y))
     test_x = torch.tensor(np.array(test_x)) 
+    test_y = torch.tensor(np.array(test_y))
 
     return train_x, train_y, test_x, test_y
 
