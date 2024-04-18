@@ -82,14 +82,14 @@ def preprocess(data_path):
 
     return train_x, train_y, test_x, test_y
 
-def train(train_x, train_y):
+def train(untrained_net, train_x, train_y):
     # Instantiate the Datasets and Loaders
     train_dataset = BreatCancerDataset(train_x, train_y)
     train_loader = DataLoader(train_dataset)
 
     # instantiate your MLP model and move to device
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
-    net = Net().to(device)
+    net = untrained_net.to(device)
     # loss function is nn.CrossEntropyLoss() for classification
     criterion = torch.nn.CrossEntropyLoss()
     # Use an Adam optimizer with a learing rate scheduler to prevent overfitting
@@ -167,3 +167,10 @@ def evaluate(trained_net, test_x, test_y):
 
     return Metric(accuracy, precision, recall, f1, auc_roc)
 
+# Demo/Usage example
+
+train_x, train_y, test_x, test_y = preprocess('./Data/data.csv')
+
+trained_net = train(Net(), train_x, train_y)
+
+performance_metrics = evaluate(trained_net, test_x, test_y)
