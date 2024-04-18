@@ -47,100 +47,122 @@ class Net(nn.Module):
         out = self.fc4(out)
 
         return out 
+    
+class Metric():
+
+    def __init__(self, accuracy, precision, recall, f1, roc_auc):
+        self.accuracy = accuracy
+        self.precision = precision
+        self.recall = recall
+        self.f1 = f1
+        self.roc_auc = roc_auc
+
 
 # Data preprocessing
-df = pd.read_csv('./Data/data.csv').dropna(axis=1)
+def preprocess(data_path):
 
-encoder = LabelEncoder()
-df['diagnosis'] = encoder.fit_transform(df['diagnosis'])
+    df = pd.read_csv(data_path).dropna(axis=1)
 
-x = df.drop(['id', 'diagnosis'], axis=1)
-y = df['diagnosis']
+    encoder = LabelEncoder()
+    df['diagnosis'] = encoder.fit_transform(df['diagnosis'])
 
-# TODO: Try normalizing the training data. How does it improve performance?
+    x = df.drop(['id', 'diagnosis'], axis=1)
+    y = df['diagnosis']
 
-# split into train and evaluation (8 : 2) using train_test_split from sklearn
-train_x, test_x, train_y, test_y = train_test_split(x, y, test_size=0.2, random_state=123)
+    # TODO: Try normalizing the training data. How does it improve performance?
 
-# Convert the partitioned data into Tensors
-train_x = torch.tensor(np.array(train_x))
-train_y = torch.tensor(np.array(train_y))
-test_x = torch.tensor(np.array(test_x)) 
-seq_len = train_x[0].shape[0] 
+    # split into train and evaluation (8 : 2) using train_test_split from sklearn
+    train_x, test_x, train_y, test_y = train_test_split(x, y, test_size=0.2, random_state=123)
 
-# Instantiate the Datasets and Loaders
-train_dataset = BreatCancerDataset(train_x, train_y)
-test_dataset = BreatCancerDataset(test_x, test_y)
-train_loader = DataLoader(train_dataset)
-test_loader = DataLoader(test_dataset)
+    # Convert the partitioned data into Tensors
+    train_x = torch.tensor(np.array(train_x))
+    train_y = torch.tensor(np.array(train_y))
+    test_x = torch.tensor(np.array(test_x)) 
 
-# instantiate your MLP model and move to device
-device = 'cuda' if torch.cuda.is_available() else 'cpu'
-net = Net().to(device)
-# loss function is nn.CrossEntropyLoss() for classification
-criterion = torch.nn.CrossEntropyLoss()
-# Use an Adam optimizer with a learing rate scheduler to prevent overfitting
-optimizer = torch.optim.Adam(params=net.parameters(), lr=0.001, weight_decay=1e-5)
-scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience=5, verbose=True)
+    return train_x, train_y, test_x, test_y
 
-# Number of epochs to use during training
-epoch_size = 20
+def train(train_x, train_y):
+    # Instantiate the Datasets and Loaders
+    train_dataset = BreatCancerDataset(train_x, train_y)
+    train_loader = DataLoader(train_dataset)
 
-# start training 
-net.train()
-for epoch in range(epoch_size): 
+    # instantiate your MLP model and move to device
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'
+    net = Net().to(device)
+    # loss function is nn.CrossEntropyLoss() for classification
+    criterion = torch.nn.CrossEntropyLoss()
+    # Use an Adam optimizer with a learing rate scheduler to prevent overfitting
+    optimizer = torch.optim.Adam(params=net.parameters(), lr=0.001, weight_decay=1e-5)
+    scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience=5, verbose=True)
 
-    loss = 0.0 # running loss
+    # Number of epochs to use during training
+    epoch_size = 15
 
-    for batch_idx, data in enumerate(train_loader):
-        # get inputs and target values from dataloaders and move to device
-        inputs, targets = data
-        inputs = inputs.to(device, dtype=torch.double)  # Ensure inputs are double
-        targets = targets.to(device, dtype=torch.long)  # Ensure targets are long for classification
-        optimizer.zero_grad()
-        outputs = net(inputs)
-        i_loss = criterion(outputs, targets)
-        i_loss.backward()
-        optimizer.step()
+    # start training 
+    net.train()
+    for epoch in range(epoch_size): 
 
-        loss += i_loss # add loss for current batch
-        if batch_idx % 100 == 99:    # print average loss per batch every 100 batches
-            print(f'[{epoch + 1}, {batch_idx + 1:5d}] loss: {loss / 100:.3f}')
-            loss = 0.0
+        loss = 0.0 # running loss
 
-    scheduler.step(loss)
+        for batch_idx, data in enumerate(train_loader):
+            # get inputs and target values from dataloaders and move to device
+            inputs, targets = data
+            inputs = inputs.to(device, dtype=torch.double)  # Ensure inputs are double
+            targets = targets.to(device, dtype=torch.long)  # Ensure targets are long for classification
+            optimizer.zero_grad()
+            outputs = net(inputs)
+            i_loss = criterion(outputs, targets)
+            i_loss.backward()
+            optimizer.step()
 
-print('Finished Training')
+            loss += i_loss # add loss for current batch
+            if batch_idx % 100 == 99:    # print average loss per batch every 100 batches
+                print(f'[{epoch + 1}, {batch_idx + 1:5d}] loss: {loss / 100:.3f}')
+                loss = 0.0
+
+        scheduler.step(loss)
+
+    print('Finished Training')
+
+    return net
 
 # Start evaluation
-predictions = []
-ground_truth = []
-net.eval()
-with torch.no_grad():
-    for data in test_loader:
-        inputs, labels = data
-        inputs = inputs.to(device)
-        
-        outputs = net(inputs)
-        probabilities = torch.softmax(outputs, dim=1)
-        
-        # Convert probabilities to binary predictions using a threshold of 0.5
-        binary_predictions = (probabilities[:, 1] >= 0.5).int()
-        
-        predictions.extend(binary_predictions.tolist())
-        ground_truth.extend(labels.tolist())
+def evaluate(trained_net, test_x, test_y):
 
-# Calculate evaluation metrics
-accuracy = accuracy_score(ground_truth, predictions)
-precision = precision_score(ground_truth, predictions)
-recall = recall_score(ground_truth, predictions)
-f1 = f1_score(ground_truth, predictions)
-auc_roc = roc_auc_score(ground_truth, predictions)
+    test_dataset = BreatCancerDataset(test_x, test_y)
+    test_loader = DataLoader(test_dataset)
 
-print('Accuracy: ', accuracy)
-print('Precision: ', precision)
-print('Recall: ', recall)
-print('F1 Score: ', f1)
-print('AUC ROC: ', auc_roc)
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
+    predictions = []
+    ground_truth = []
+    trained_net.eval()
+    with torch.no_grad():
+        for data in test_loader:
+            inputs, labels = data
+            inputs = inputs.to(device)
+            
+            outputs = trained_net(inputs)
+            probabilities = torch.softmax(outputs, dim=1)
+            
+            # Convert probabilities to binary predictions using a threshold of 0.5
+            binary_predictions = (probabilities[:, 1] >= 0.5).int()
+            
+            predictions.extend(binary_predictions.tolist())
+            ground_truth.extend(labels.tolist())
+
+    # Calculate evaluation metrics
+    accuracy = accuracy_score(ground_truth, predictions)
+    precision = precision_score(ground_truth, predictions)
+    recall = recall_score(ground_truth, predictions)
+    f1 = f1_score(ground_truth, predictions)
+    auc_roc = roc_auc_score(ground_truth, predictions)
+
+    print('Accuracy: ', accuracy)
+    print('Precision: ', precision)
+    print('Recall: ', recall)
+    print('F1 Score: ', f1)
+    print('AUC ROC: ', auc_roc)
+
+    return Metric(accuracy, precision, recall, f1, auc_roc)
 
