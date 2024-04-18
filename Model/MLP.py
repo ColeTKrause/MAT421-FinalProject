@@ -1,4 +1,4 @@
-from sklearn.metrics import f1_score, r2_score, accuracy_score, recall_score, precision_score, roc_auc_score
+from sklearn.metrics import f1_score, accuracy_score, recall_score, precision_score, roc_auc_score
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler, LabelEncoder
 import torch
@@ -12,6 +12,7 @@ import numpy as np
 
 torch.manual_seed(42)
 
+# Dataset
 class BreatCancerDataset(Dataset):
     def __init__(self, train_x, train_y):
         super(Dataset, self).__init__()
@@ -26,7 +27,7 @@ class BreatCancerDataset(Dataset):
         label = torch.tensor(train_y[idx], dtype=torch.int)
         return sample, label
 
-# Four layer neural network with RELU between hidden layers and softmax on output
+# Neural Network 
 class Net(nn.Module):
 
     def __init__(self):
@@ -46,10 +47,8 @@ class Net(nn.Module):
         out = self.fc4(out)
 
         return out 
-    
-# TODO: 
-# - Create dataloader and get train/test splits
 
+# Data preprocessing
 df = pd.read_csv('./Data/data.csv').dropna(axis=1)
 
 encoder = LabelEncoder()
@@ -58,40 +57,40 @@ df['diagnosis'] = encoder.fit_transform(df['diagnosis'])
 x = df.drop(['id', 'diagnosis'], axis=1)
 y = df['diagnosis']
 
+# TODO: Try normalizing the training data. How does it improve performance?
 
 # split into train and evaluation (8 : 2) using train_test_split from sklearn
 train_x, test_x, train_y, test_y = train_test_split(x, y, test_size=0.2, random_state=123)
 
-
-# now make x and y tensors, think about the shape of train_x, it should be (total_examples, sequence_lenth, feature_size)
-# we wlll make sequence_length just 1 for simplicity, and you could use unsqueeze at dimension 1 to do this
-# also when you create tensor, it needs to be float type since pytorch training does not take default type read using pandas
+# Convert the partitioned data into Tensors
 train_x = torch.tensor(np.array(train_x))
 train_y = torch.tensor(np.array(train_y))
 test_x = torch.tensor(np.array(test_x)) 
-seq_len = train_x[0].shape[0] # it is actually just 1 as explained above
+seq_len = train_x[0].shape[0] 
 
+# Instantiate the Datasets and Loaders
 train_dataset = BreatCancerDataset(train_x, train_y)
 test_dataset = BreatCancerDataset(test_x, test_y)
 train_loader = DataLoader(train_dataset)
 test_loader = DataLoader(test_dataset)
 
-# instantiate your MLP model and move to device as in cnn section
+# instantiate your MLP model and move to device
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 net = Net().to(device)
-# loss function is nn.MSELoss since it is regression task
+# loss function is nn.CrossEntropyLoss() for classification
 criterion = torch.nn.CrossEntropyLoss()
-# try Adam optimizer (https://pytorch.org/docs/stable/generated/torch.optim.Adam.html) with learning rate 0.0001, feel free to use other optimizer
+# Use an Adam optimizer with a learing rate scheduler to prevent overfitting
 optimizer = torch.optim.Adam(params=net.parameters(), lr=0.001, weight_decay=1e-5)
 scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience=5, verbose=True)
 
+# Number of epochs to use during training
 epoch_size = 20
 
 # start training 
 net.train()
 for epoch in range(epoch_size): 
 
-    loss = 0.0 # you can print out average loss per batch every certain batches
+    loss = 0.0 # running loss
 
     for batch_idx, data in enumerate(train_loader):
         # get inputs and target values from dataloaders and move to device
@@ -100,7 +99,7 @@ for epoch in range(epoch_size):
         targets = targets.to(device, dtype=torch.long)  # Ensure targets are long for classification
         optimizer.zero_grad()
         outputs = net(inputs)
-        i_loss = criterion(outputs, targets)  # Unsqueezing targets for MSE loss
+        i_loss = criterion(outputs, targets)
         i_loss.backward()
         optimizer.step()
 
@@ -113,11 +112,9 @@ for epoch in range(epoch_size):
 
 print('Finished Training')
 
-
-
+# Start evaluation
 predictions = []
 ground_truth = []
-# evaluation
 net.eval()
 with torch.no_grad():
     for data in test_loader:
