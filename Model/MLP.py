@@ -30,10 +30,10 @@ class BreatCancerDataset(Dataset):
 # Neural Network 
 class Net(nn.Module):
 
-    def __init__(self):
+    def __init__(self, num_input_features):
         super(Net, self).__init__()
 
-        self.fc1 = nn.Linear(30, 64) 
+        self.fc1 = nn.Linear(num_input_features, 64) 
         self.fc2 = nn.Linear(64,64)
         self.fc3 = nn.Linear(64,32)
         self.fc4 = nn.Linear(32, 2)
@@ -59,7 +59,7 @@ class Metric():
 
 
 # Data preprocessing
-def preprocess(data_path):
+def preprocess_from_file(data_path):
 
     df = pd.read_csv(data_path).dropna(axis=1)
 
@@ -71,6 +71,18 @@ def preprocess(data_path):
 
     # TODO: Try normalizing the training data. How does it improve performance?
 
+    # split into train and evaluation (8 : 2) using train_test_split from sklearn
+    train_x, test_x, train_y, test_y = train_test_split(x, y, test_size=0.2, random_state=123)
+
+    # Convert the partitioned data into Tensors
+    train_x = torch.tensor(np.array(train_x))
+    train_y = torch.tensor(np.array(train_y))
+    test_x = torch.tensor(np.array(test_x)) 
+    test_y = torch.tensor(np.array(test_y))
+
+    return train_x, train_y, test_x, test_y
+
+def preprocess_from_data(x, y):
     # split into train and evaluation (8 : 2) using train_test_split from sklearn
     train_x, test_x, train_y, test_y = train_test_split(x, y, test_size=0.2, random_state=123)
 
@@ -168,9 +180,11 @@ def evaluate(trained_net, test_x, test_y):
     return Metric(accuracy, precision, recall, f1, auc_roc)
 
 # Demo/Usage example
+if __name__=="__main__":
+    train_x, train_y, test_x, test_y = preprocess_from_file('./Data/data.csv')
 
-train_x, train_y, test_x, test_y = preprocess('./Data/data.csv')
+    print(train_x)
 
-trained_net = train(Net(), train_x, train_y)
+    trained_net = train(Net(30), train_x, train_y)
 
-performance_metrics = evaluate(trained_net, test_x, test_y)
+    performance_metrics = evaluate(trained_net, test_x, test_y)
