@@ -35,8 +35,11 @@ class Net(nn.Module):
 
         self.fc1 = nn.Linear(num_input_features, 64) 
         self.fc2 = nn.Linear(64,64)
-        self.fc3 = nn.Linear(64,32)
-        self.fc4 = nn.Linear(32, 2)
+        self.fc3 = nn.Linear(64, 232)
+        self.fc4 = nn.Linear(232, 232)
+        self.fc5 = nn.Linear(232, 64)
+        self.fc6 = nn.Linear(64,32)
+        self.fc7 = nn.Linear(32, 2)
         self.dropout = nn.Dropout(0.5)
         self.double()
 
@@ -44,7 +47,10 @@ class Net(nn.Module):
         out = self.dropout(F.relu(self.fc1(x)))
         out = self.dropout(F.relu(self.fc2(out)))
         out = self.dropout(F.relu(self.fc3(out)))
-        out = self.fc4(out)
+        out = self.dropout(F.relu(self.fc4(out)))
+        out = self.dropout(F.relu(self.fc5(out)))
+        out = self.dropout(F.relu(self.fc6(out)))
+        out = self.fc7(out)
 
         return out 
     
@@ -70,6 +76,7 @@ def preprocess_from_file(data_path):
     y = df['diagnosis']
 
     # TODO: Try normalizing the training data. How does it improve performance?
+    x_scaled = StandardScaler().fit_transform(x)
 
     # split into train and evaluation (8 : 2) using train_test_split from sklearn
     train_x, test_x, train_y, test_y = train_test_split(x, y, test_size=0.2, random_state=123)
@@ -159,7 +166,7 @@ def evaluate(trained_net, test_x, test_y):
             probabilities = torch.softmax(outputs, dim=1)
             
             # Convert probabilities to binary predictions using a threshold of 0.5
-            binary_predictions = (probabilities[:, 1] >= 0.5).int()
+            binary_predictions = (probabilities[:, 1] >= 0.25).int()
             
             predictions.extend(binary_predictions.tolist())
             ground_truth.extend(labels.tolist())
@@ -182,8 +189,6 @@ def evaluate(trained_net, test_x, test_y):
 # Demo/Usage example
 if __name__=="__main__":
     train_x, train_y, test_x, test_y = preprocess_from_file('./Data/data.csv')
-
-    print(train_x)
 
     trained_net = train(Net(30), train_x, train_y)
 

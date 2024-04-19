@@ -2,6 +2,7 @@ from MLP import preprocess_from_data, Net, train, evaluate
 from sklearn.metrics import f1_score, accuracy_score, recall_score, precision_score, roc_auc_score
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler, LabelEncoder
+from sklearn.decomposition import PCA
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -20,25 +21,41 @@ encoder = LabelEncoder()
 df['diagnosis'] = encoder.fit_transform(df['diagnosis'])
 y = df['diagnosis']
 
+
 data = np.array(x)
 
-X = data - np.mean(data, axis=0)
+data_scaled = StandardScaler().fit_transform(data)
 
-covariance_matrix = X.T @ X / X.shape[0]
+pca = PCA(n_components=30)
+pca_features = pca.fit_transform(data_scaled)
 
-eigenvalues, eigenvectors = np.linalg.eig(covariance_matrix)
+plt.bar(
+    range(1,len(pca.explained_variance_)+1),
+    pca.explained_variance_
+    )
 
-transformed_data = X @ eigenvectors
-
-# Plot PCA transformed data
-fig = plt.figure(figsize=(10, 8))
-plt.scatter(transformed_data[:, 0], transformed_data[:, 1], c='b', marker='o')
-plt.xlabel('PCA1')
-plt.ylabel('PCA2')
-plt.title('Data after PCA')
+plt.xlabel('PCA Feature')
+plt.ylabel('Explained variance')
+plt.title('Feature Explained Variance')
 plt.show()
 
-train_x, train_y, test_x, test_y = preprocess_from_data(transformed_data[:,:4], y)
+# Plot PCA transformed data
+fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 6))
+fig.suptitle('Data after PCA')
+
+ax1.scatter(pca_features[:, 0], pca_features[:, 1], c='b', marker='o')
+ax1.set_xlabel('PCA1')
+ax1.set_ylabel('PCA2')
+
+ax2 = fig.add_subplot(1, 2, 2, projection='3d')
+ax2.scatter(pca_features[:, 0], pca_features[:, 1], pca_features[:, 2], c='b', marker='o')
+ax2.set_xlabel('PCA1')
+ax2.set_ylabel('PCA2')
+ax2.set_zlabel('PCA3', rotation=90)
+
+plt.show()
+
+train_x, train_y, test_x, test_y = preprocess_from_data(pca_features[:,:4], y)
 
 print(train_x)
 
